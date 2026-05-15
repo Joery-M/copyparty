@@ -5772,7 +5772,7 @@ class HttpCli(object):
         self.redirect("", "?h#cc")
         return True
 
-    def tx_404(self, is_403: bool = False) -> bool:
+    def tx_404(self, is_403: bool = False, no_img_fallback: bool = False) -> bool:
         rc = 404
         if self.args.vague_403:
             t = '<h1 id="n">404 not found &nbsp;┐( ´ -`)┌</h1><p id="o">or maybe you don\'t have access -- try a password or <a href="{}/?h">go home</a></p>'
@@ -5791,7 +5791,11 @@ class HttpCli(object):
             return True
 
         if "th" in self.ouparam and str(self.ouparam["th"])[:1] in "jw":
-            return self.tx_svg("e" + pt[:3])
+            if no_img_fallback:
+                self.reply(b"", status=404, mime="")
+                return True
+            else:
+                return self.tx_svg("e" + pt[:3])
 
         # most webdav clients will not send credentials until they
         # get 401'd, so send a challenge if we're Absolutely Sure
@@ -6946,7 +6950,7 @@ class HttpCli(object):
                                 pass
 
                     if is_dir:
-                        return self.tx_svg("folder")
+                        return self.tx_404(no_img_fallback = True) if th_fmt[1:2] == "r" else self.tx_svg("folder")
 
                 thp = None
                 if self.thumbcli and not nothumb:
@@ -6955,7 +6959,7 @@ class HttpCli(object):
                     except Pebkac as ex:
                         if ex.code == 500 and th_fmt[:1] in "jw":
                             self.log("failed to convert [%s]:\n%s" % (abspath, ex), 3)
-                            return self.tx_svg("--error--\ncheck\nserver\nlog")
+                            return self.tx_404(no_img_fallback = True) if th_fmt[1:2] == "r" else self.tx_svg("--error--\ncheck\nserver\nlog")
                         raise
 
                 if thp:
@@ -6966,7 +6970,7 @@ class HttpCli(object):
                 elif th_fmt in ACODE2_FMT:
                     raise Pebkac(415)
 
-                return self.tx_ico(rem)
+                return self.tx_404(no_img_fallback = True) if th_fmt[1:2] == "r" else self.tx_ico(rem)
 
         elif self.can_write and th_fmt is not None:
             return self.tx_svg("upload\nonly")
