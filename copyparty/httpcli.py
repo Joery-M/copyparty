@@ -1515,7 +1515,7 @@ class HttpCli(object):
                 return self.tx_idp()
 
         if "h" in self.uparam:
-            return self.tx_mounts()
+            return self.tx_mounts_json() if self.uparam['h'] == "json" else self.tx_mounts()
 
         if "ups" in self.uparam:
             # vpath is used for share translation
@@ -5651,6 +5651,101 @@ class HttpCli(object):
             ahttps="" if self.is_https else "https://" + self.host + self.req,
         )
         self.reply(html.encode("utf-8"))
+        return True
+
+    def tx_mounts_json(self) -> bool:
+        rvol, wvol, avol = [
+            [("/" + x).rstrip("/") + "/" for x in y]
+            for y in [self.rvol, self.wvol, self.avol]
+        ]
+        for zs in self.asrv.vfs.all_fvols:
+            if not zs:
+                continue  # webroot
+            zs2 = ("/" + zs).rstrip("/") + "/"
+            for zsl in (rvol, wvol, avol):
+                if zs2 in zsl:
+                    zsl[zsl.index(zs2)] = zs2[:-1]
+
+        ups: list[dict[str, Any]] = []
+        now = time.time()
+        get_vst = self.avol and not self.args.no_rescan
+        get_ups = self.rvol and not self.args.no_up_list and self.uname or ""
+        if get_vst or get_ups:
+            x = self.conn.hsrv.broker.ask("up2k.get_state", get_vst, get_ups)
+            vs = json.loads(x.get())
+            vstate = {("/" + k).rstrip("/") + "/": v for k, v in vs["volstate"].items()}
+            try:
+                for rem, sz, t0, poke, vp in vs["ups"]:
+                    fdone = max(0.001, 1 - rem)
+                    td = max(0.1, now - t0)
+                    path = os.sep.split(vp)
+                    spd = sz * fdone / td
+                    eta = (td / fdone) - td if rem < 1 else None
+                    idle = now - poke
+                    ups.append({
+                        "done": fdone,
+                        "speed": spd,
+                        "eta": eta,
+                        "idle": idle,
+                        "path": path
+                    })
+            except Exception as ex:
+                self.log("failed to list upload progress: %r" % (ex,), 1)
+        if not get_vst:
+            vstate = {}
+            vs = {
+                "scanning": None,
+                "hashq": None,
+                "tagq": None,
+                "mtpq": None,
+                "dbwt": None,
+            }
+
+        assert vstate is not None and vstate.items and vs  # type: ignore  # !rm
+
+        dl_list = []
+        if self.conn.hsrv.tdls:
+            zi = self.args.dl_list
+            if zi == 2 or (zi == 1 and self.avol):
+                dl_list = self.get_dls()
+        dls: list[dict[str, Any]] = []
+        for t0, t1, sent, sz, vp, dl_id, uname in dl_list:
+            td = max(0.1, now - t0)
+            path = os.sep.split(vp)
+            if sz and sent and td:
+                eta = (sz - sent) / (sent / td)
+                perc = sent / sz
+            else:
+                eta = perc = None
+
+            dls.append({
+                "done": perc,
+                "sent": sent,
+                "speed": sent / td,
+                "eta": eta,
+                "idle": now - t1,
+                "uname": uname,
+                "path": path,
+                "id": dl_id,
+            })
+
+        if self.args.have_unlistc:
+            allvols = self.asrv.vfs.all_nodes
+            rvol = [x for x in rvol if "unlistcr" not in allvols[x.strip("/")].flags]
+            wvol = [x for x in wvol if "unlistcw" not in allvols[x.strip("/")].flags]
+
+        ret: dict[str, Any] = { 
+            "usernames": self.args.usernames,
+            "uname": None if self.uname == "*" else self.uname,
+            "status": vs,
+            "uploads": ups,
+            "downloads": dls,
+            "readable": rvol,
+            "writable": wvol,
+        }
+
+        zb = json.dumps(ret)
+        self.reply(zb.encode(), mime="application/json")
         return True
 
     def setck(self) -> bool:
