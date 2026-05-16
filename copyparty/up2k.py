@@ -380,8 +380,45 @@ class Up2k(object):
             ),
         }
         return json.dumps(ret, separators=(",\n", ": "))
+    
+    def get_state_raw(self, get_q: bool, uname: str) -> str:
+        mtpq: int | None = 0
+        ups = []
+        up_en = not self.args.no_up_list
+        q = "select count(w) from mt where k = 't:mtp'"
+        got_lock = False if PY2 else self.mutex.acquire(timeout=0.5)
+        if got_lock:
+            try:
+                for cur in self.cur.values() if get_q else []:
+                    try:
+                        mtpq += cur.execute(q).fetchone()[0]
+                    except:
+                        pass
+                if uname and up_en:
+                    ups = self._active_uploads(uname)
+            finally:
+                self.mutex.release()
+            ups.sort(reverse=True)
+        else:
+            mtpq = None
+            if up_en:
+                ups = True
+                if PY2:
+                    ups = []
 
-    def _active_uploads(self, uname: str) -> list[tuple[float, int, int, str]]:
+        ret = {
+            "volstate": self.volstate,
+            "scanning": bool(self.pp),
+            "hashq": self.n_hashq,
+            "tagq": self.n_tagq,
+            "mtpq": mtpq,
+            "ups": ups,
+            "dbwu": self.db_act,
+            "dbwt": min(1000 * 24 * 60 * 60 - 1, time.time() - self.db_act),
+        }
+        return json.dumps(ret, separators=(",\n", ": "))
+
+    def _active_uploads(self, uname: str) -> list[tuple[float, int, int, int, str]]:
         ret = []
         for vtop in self.vfs.aread.get(uname) or []:
             vfs = self.vfs.all_vols.get(vtop)

@@ -1515,7 +1515,7 @@ class HttpCli(object):
                 return self.tx_idp()
 
         if "h" in self.uparam:
-            return self.tx_mounts_json() if self.uparam['h'] == "json" else self.tx_mounts()
+            return self.tx_mounts_json() if self.uparam['h'] == "j" else self.tx_mounts()
 
         if "ups" in self.uparam:
             # vpath is used for share translation
@@ -5671,7 +5671,7 @@ class HttpCli(object):
         get_vst = self.avol and not self.args.no_rescan
         get_ups = self.rvol and not self.args.no_up_list and self.uname or ""
         if get_vst or get_ups:
-            x = self.conn.hsrv.broker.ask("up2k.get_state", get_vst, get_ups)
+            x = self.conn.hsrv.broker.ask("up2k.get_state_raw", get_vst, get_ups)
             vs = json.loads(x.get())
             vstate = {("/" + k).rstrip("/") + "/": v for k, v in vs["volstate"].items()}
             try:
@@ -5694,10 +5694,13 @@ class HttpCli(object):
         if not get_vst:
             vstate = {}
             vs = {
+                "volstate": None,
                 "scanning": None,
                 "hashq": None,
                 "tagq": None,
                 "mtpq": None,
+                "ups": None,
+                "dbwu": None,
                 "dbwt": None,
             }
 
