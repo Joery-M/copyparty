@@ -6917,6 +6917,7 @@ class HttpCli(object):
             use_dirkey = use_filekey = False
 
         th_fmt = self.uparam.get("th")
+        no_fallback = self.uparam.get("no_fallback") is not None
         if self.can_read or (
             self.can_get
             and (use_filekey or use_dirkey or (not is_dir and "fk" not in vn.flags))
@@ -6953,7 +6954,7 @@ class HttpCli(object):
                                 pass
 
                     if is_dir:
-                        return self.tx_404(no_img_fallback = True) if th_fmt[1:2] == "r" else self.tx_svg("folder")
+                        return self.tx_404(no_img_fallback = True) if no_fallback else self.tx_svg("folder")
 
                 thp = None
                 if self.thumbcli and not nothumb:
@@ -6962,7 +6963,7 @@ class HttpCli(object):
                     except Pebkac as ex:
                         if ex.code == 500 and th_fmt[:1] in "jw":
                             self.log("failed to convert [%s]:\n%s" % (abspath, ex), 3)
-                            return self.tx_404(no_img_fallback = True) if th_fmt[1:2] == "r" else self.tx_svg("--error--\ncheck\nserver\nlog")
+                            return self.tx_404(no_img_fallback = True) if no_fallback else self.tx_svg("--error--\ncheck\nserver\nlog")
                         raise
 
                 if thp:
@@ -6973,7 +6974,7 @@ class HttpCli(object):
                 elif th_fmt in ACODE2_FMT:
                     raise Pebkac(415)
 
-                return self.tx_404(no_img_fallback = True) if th_fmt[1:2] == "r" else self.tx_ico(rem)
+                return self.tx_404(no_img_fallback = True) if no_fallback else self.tx_ico(rem)
 
         elif self.can_write and th_fmt is not None:
             return self.tx_svg("upload\nonly")
