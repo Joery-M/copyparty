@@ -402,9 +402,7 @@ class Up2k(object):
         else:
             mtpq = None
             if up_en:
-                ups = True
-                if PY2:
-                    ups = []
+                ups = []
 
         ret = {
             "volstate": self.volstate,
