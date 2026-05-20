@@ -1515,7 +1515,9 @@ class HttpCli(object):
                 return self.tx_idp()
 
         if "h" in self.uparam:
-            return self.tx_mounts_json() if self.ouparam['h'] == "j" else self.tx_mounts()
+            return (
+                self.tx_mounts_json() if self.ouparam["h"] == "j" else self.tx_mounts()
+            )
 
         if "ups" in self.uparam:
             # vpath is used for share translation
@@ -3433,15 +3435,15 @@ class HttpCli(object):
         if self.args.usernames and not (
             self.args.shr and self.vpath.startswith(self.args.shr1)
         ):
-            un = body['uname'] if "uname" in body else None
+            un = body["uname"] if "uname" in body else None
         else:
             un = None
-            
-        pwd = body['pwd'] if "pwd" in body else None
+
+        pwd = body["pwd"] if "pwd" in body else None
         if not pwd:
             raise Pebkac(422, "password cannot be blank")
-        
-        uhash = body['uhash'] if "uhash" in body else None
+
+        uhash = body["uhash"] if "uhash" in body else None
         if not uhash or len(uhash) > 256:
             uhash = ""
 
@@ -3461,10 +3463,10 @@ class HttpCli(object):
 
         ok, _, uname = self.get_pwd_cookie(pwd)
         if ok:
-            zb = json.dumps({ "continue": dst, "uname": uname })
+            zb = json.dumps({"continue": dst, "uname": uname})
             self.reply(zb.encode(), mime="application/json", status=200)
         else:
-            zb = json.dumps({ "continue": dst, "uname": uname })
+            zb = json.dumps({"continue": dst, "uname": uname})
             self.reply(zb.encode(), mime="application/json", status=401)
         return True
 
@@ -3490,7 +3492,7 @@ class HttpCli(object):
         self.get_pwd_cookie("x")
 
         dst = self.args.idp_logout or (self.args.SRS + "?h")
-        zb = json.dumps({ "continue": dst })
+        zb = json.dumps({"continue": dst})
         self.reply(zb.encode(), mime="application/json", status=200)
         return True
 
@@ -5739,13 +5741,15 @@ class HttpCli(object):
                     spd = sz * fdone / td
                     eta = (td / fdone) - td if rem < 1 else None
                     idle = now - poke
-                    ups.append({
-                        "done": fdone,
-                        "speed": spd,
-                        "eta": eta,
-                        "idle": idle,
-                        "path": path
-                    })
+                    ups.append(
+                        {
+                            "done": fdone,
+                            "speed": spd,
+                            "eta": eta,
+                            "idle": idle,
+                            "path": path,
+                        }
+                    )
             except Exception as ex:
                 self.log("failed to list upload progress: %r" % (ex,), 1)
         if not get_vst:
@@ -5778,23 +5782,25 @@ class HttpCli(object):
             else:
                 eta = perc = None
 
-            dls.append({
-                "done": perc,
-                "sent": sent,
-                "speed": sent / td,
-                "eta": eta,
-                "idle": now - t1,
-                "uname": uname,
-                "path": path,
-                "id": dl_id,
-            })
+            dls.append(
+                {
+                    "done": perc,
+                    "sent": sent,
+                    "speed": sent / td,
+                    "eta": eta,
+                    "idle": now - t1,
+                    "uname": uname,
+                    "path": path,
+                    "id": dl_id,
+                }
+            )
 
         if self.args.have_unlistc:
             allvols = self.asrv.vfs.all_nodes
             rvol = [x for x in rvol if "unlistcr" not in allvols[x.strip("/")].flags]
             wvol = [x for x in wvol if "unlistcw" not in allvols[x.strip("/")].flags]
 
-        ret: dict[str, Any] = { 
+        ret: dict[str, Any] = {
             "usernames": self.args.usernames,
             "uname": None if self.uname == "*" else self.uname,
             "status": vs,
@@ -7011,7 +7017,11 @@ class HttpCli(object):
                                 pass
 
                     if is_dir:
-                        return self.tx_404(no_img_fallback = True) if no_fallback else self.tx_svg("folder")
+                        return (
+                            self.tx_404(no_img_fallback=True)
+                            if no_fallback
+                            else self.tx_svg("folder")
+                        )
 
                 thp = None
                 if self.thumbcli and not nothumb:
@@ -7020,7 +7030,11 @@ class HttpCli(object):
                     except Pebkac as ex:
                         if ex.code == 500 and th_fmt[:1] in "jw":
                             self.log("failed to convert [%s]:\n%s" % (abspath, ex), 3)
-                            return self.tx_404(no_img_fallback = True) if no_fallback else self.tx_svg("--error--\ncheck\nserver\nlog")
+                            return (
+                                self.tx_404(no_img_fallback=True)
+                                if no_fallback
+                                else self.tx_svg("--error--\ncheck\nserver\nlog")
+                            )
                         raise
 
                 if thp:
@@ -7031,10 +7045,18 @@ class HttpCli(object):
                 elif th_fmt in ACODE2_FMT:
                     raise Pebkac(415)
 
-                return self.tx_404(no_img_fallback = True) if no_fallback else self.tx_ico(rem)
+                return (
+                    self.tx_404(no_img_fallback=True)
+                    if no_fallback
+                    else self.tx_ico(rem)
+                )
 
         elif self.can_write and th_fmt is not None:
-            return self.tx_404(no_img_fallback = True) if no_fallback else self.tx_svg("upload\nonly")
+            return (
+                self.tx_404(no_img_fallback=True)
+                if no_fallback
+                else self.tx_svg("upload\nonly")
+            )
 
         if not self.can_read and self.can_get and self.avn:
             if not self.can_html:

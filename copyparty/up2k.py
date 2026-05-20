@@ -380,7 +380,7 @@ class Up2k(object):
             ),
         }
         return json.dumps(ret, separators=(",\n", ": "))
-    
+
     def get_state_raw(self, get_q: bool, uname: str) -> str:
         mtpq: int | None = 0
         ups = []
