@@ -2996,6 +2996,12 @@ class HttpCli(object):
         # self.reply(b"cloudflare", 503)
         # return True
 
+        if "login" in self.uparam:
+            return self.handle_login_json(body)
+
+        if "logout" in self.uparam:
+            return self.handle_logout_json()
+
         if "srch" in self.uparam or "srch" in body:
             return self.handle_search(body)
 
@@ -3372,7 +3378,7 @@ class HttpCli(object):
             self.cbonk(self.conn.hsrv.gpwc, pwd, "pw", "too many password changes")
             if self.args.usernames:
                 pwd = "%s:%s" % (self.uname, pwd)
-            ok, msg = self.get_pwd_cookie(pwd)
+            ok, msg, _ = self.get_pwd_cookie(pwd)
             if ok:
                 msg = "new password OK"
 
@@ -3417,10 +3423,49 @@ class HttpCli(object):
             dst += "&" if "?" in dst else "?"
             dst += "_=1#" + html_escape(uhash, True, True)
 
-        _, msg = self.get_pwd_cookie(pwd)
+        _, msg, _ = self.get_pwd_cookie(pwd)
         h2 = '<a href="' + dst + '">continue</a>'
         html = self.j2s("msg", h1=msg, h2=h2, redir=dst)
         self.reply(html.encode("utf-8"))
+        return True
+
+    def handle_login_json(self, body: dict[str, Any]) -> bool:
+        if self.args.usernames and not (
+            self.args.shr and self.vpath.startswith(self.args.shr1)
+        ):
+            un = body['uname'] if "uname" in body else None
+        else:
+            un = None
+            
+        pwd = body['pwd'] if "pwd" in body else None
+        if not pwd:
+            raise Pebkac(422, "password cannot be blank")
+        
+        uhash = body['uhash'] if "uhash" in body else None
+        if not uhash or len(uhash) > 256:
+            uhash = ""
+
+        if un:
+            pwd = "%s:%s" % (un, pwd)
+
+        dst = self.args.SRS
+        if self.vpath:
+            dst += quotep(self.vpaths)
+
+        dst += self.ourlq()
+
+        uhash = uhash.lstrip("#")
+        if uhash not in ("", "-"):
+            dst += "&" if "?" in dst else "?"
+            dst += "_=1#" + html_escape(uhash, True, True)
+
+        ok, _, uname = self.get_pwd_cookie(pwd)
+        if ok:
+            zb = json.dumps({ "continue": dst, "uname": uname })
+            self.reply(zb.encode(), mime="application/json", status=200)
+        else:
+            zb = json.dumps({ "continue": dst, "uname": uname })
+            self.reply(zb.encode(), mime="application/json", status=401)
         return True
 
     def handle_logout(self) -> bool:
@@ -3438,7 +3483,18 @@ class HttpCli(object):
         self.reply(html.encode("utf-8"))
         return True
 
-    def get_pwd_cookie(self, pwd: str) -> tuple[bool, str]:
+    def handle_logout_json(self) -> bool:
+        self.log("logout " + self.uname)
+        if not self.uname.startswith("s_"):
+            self.asrv.forget_session(self.conn.hsrv.broker, self.uname)
+        self.get_pwd_cookie("x")
+
+        dst = self.args.idp_logout or (self.args.SRS + "?h")
+        zb = json.dumps({ "continue": dst })
+        self.reply(zb.encode(), mime="application/json", status=200)
+        return True
+
+    def get_pwd_cookie(self, pwd: str) -> tuple[bool, str, str | None]:
         uname = self.asrv.sesa.get(pwd)
         if not uname:
             hpwd = self.asrv.ah.hash(pwd)
@@ -3468,6 +3524,7 @@ class HttpCli(object):
             msg = "naw dude"
             pwd = "x"  # nosec
             dur = 0
+            uname = ""
 
         if pwd == "x":
             # reset both plaintext and tls
@@ -3489,7 +3546,7 @@ class HttpCli(object):
             )
             self.out_headers["Set-Cookie"] = ck
 
-        return dur > 0, msg
+        return dur > 0, msg, (uname if uname else None)
 
     def set_idp_cookie(self, ases) -> None:
         k = "cppws" if self.is_https else "cppwd"
