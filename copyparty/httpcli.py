@@ -6977,7 +6977,7 @@ class HttpCli(object):
                 return self.tx_404(no_img_fallback = True) if no_fallback else self.tx_ico(rem)
 
         elif self.can_write and th_fmt is not None:
-            return self.tx_svg("upload\nonly")
+            return self.tx_404(no_img_fallback = True) if no_fallback else self.tx_svg("upload\nonly")
 
         if not self.can_read and self.can_get and self.avn:
             if not self.can_html:
