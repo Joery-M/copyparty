@@ -1390,7 +1390,7 @@ class HttpCli(object):
             else:
                 res_path = "web/" + self.vpath[5:]
 
-            if res_path in RES:
+            if res_path in RES or res_path.startswith("web/vue/"):
                 ap = self.E.mod_ + res_path
                 if bos.path.exists(ap) or bos.path.exists(ap + ".gz"):
                     return self.tx_file("oh_g", ap)
@@ -5841,14 +5841,11 @@ class HttpCli(object):
     def tx_404(self, is_403: bool = False, no_img_fallback: bool = False) -> bool:
         rc = 404
         if self.args.vague_403:
-            t = '<h1 id="n">404 not found &nbsp;┐( ´ -`)┌</h1><p id="o">or maybe you don\'t have access -- try a password or <a href="{}/?h">go home</a></p>'
             pt = "404 not found  ┐( ´ -`)┌   (or maybe you don't have access -- try a password)"
         elif is_403:
-            t = '<h1 id="p">403 forbiddena &nbsp;~┻━┻</h1><p id="q">use a password or <a href="{}/?h">go home</a></p>'
             pt = "403 forbiddena ~┻━┻   (you'll have to log in)"
             rc = 403
         else:
-            t = '<h1 id="n">404 not found &nbsp;┐( ´ -`)┌</h1><p><a id="r" href="{}/?h">go home</a></p>'
             pt = "404 not found  ┐( ´ -`)┌"
 
         if self.ua.startswith(("curl/", "fetch")):
@@ -5880,17 +5877,7 @@ class HttpCli(object):
                 rc = 401
                 self.out_headers["WWW-Authenticate"] = 'Basic realm="a"'
 
-        t = t.format(self.args.SR)
-        qv = quotep(self.vpaths) + self.ourlq()
-        html = self.j2s(
-            "splash",
-            this=self,
-            qvpath=qv,
-            msg=t,
-            in_shr=self.args.shr and self.vpath.startswith(self.args.shr1),
-            ahttps="" if self.is_https else "https://" + self.host + self.req,
-        )
-        self.reply(html.encode("utf-8"), status=rc)
+        self.reply(self.j2s("vue/index").encode("utf-8"), status=rc)
         return True
 
     def on40x(self, mods: list[str], vn: VFS, rem: str) -> str:
@@ -7110,24 +7097,6 @@ class HttpCli(object):
                     is_dk = True
                     vpnodes.pop()
 
-            if (
-                (
-                    (is_md and "v" in self.uparam)
-                    or "edit" in self.uparam
-                    or "edit2" in self.uparam
-                )
-                and "nohtml" not in vn.flags
-                and (
-                    is_md
-                    or self.can_delete
-                    or (
-                        "." in abspath
-                        and abspath.rsplit(".", 1)[1].lower() in vn.flags["rw_edit_set"]
-                    )
-                )
-            ):
-                return self.tx_md(vn, abspath)
-
             if "zls" in self.uparam:
                 return self.tx_zls(abspath)
             if "zget" in self.uparam:
@@ -7216,7 +7185,7 @@ class HttpCli(object):
             self.uparam["ls"] = "v"
             is_ls = True
 
-        tpl = "browser"
+        tpl = "vue/index"
         if "b" in self.uparam:
             tpl = "browser2"
             is_js = False

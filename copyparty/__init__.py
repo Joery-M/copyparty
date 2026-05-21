@@ -61,41 +61,27 @@ try:
 except:
     CORES = (os.cpu_count() if hasattr(os, "cpu_count") else 0) or 2
 
+try:
+    from ._vue_assets import VUE_ASSETS
+except:
+    VUE_ASSETS = []
+
 # all embedded resources to be retrievable over http
 zs = """
 web/a/partyfuse.py
 web/a/u2c.py
 web/a/webdav-cfg.txt
 web/baguettebox.js
-web/browser.css
-web/browser.html
-web/browser.js
 web/browser2.html
 web/cf.html
 web/copyparty.gif
 web/deps/busy.mp3
-web/deps/easymde.css
-web/deps/easymde.js
-web/deps/marked.js
 web/deps/fuse.py
 web/deps/mini-fa.css
 web/deps/mini-fa.woff
-web/deps/prism.css
-web/deps/prism.js
-web/deps/prismd.css
 web/deps/scp.woff2
-web/deps/sha512.ac.js
-web/deps/sha512.hw.js
 web/idp.html
 web/iiam.gif
-web/md.css
-web/md.html
-web/md.js
-web/md2.css
-web/md2.js
-web/mde.css
-web/mde.html
-web/mde.js
 web/msg.html
 web/opds.xml
 web/rups.css
@@ -132,11 +118,9 @@ web/tl/tur.js
 web/tl/ukr.js
 web/tl/vie.js
 web/ui.css
-web/up2k.js
 web/util.js
-web/w.hash.js
 """
-RES = set(zs.strip().split("\n"))
+RES = set(zs.strip().split("\n") + VUE_ASSETS)
 RESM = {
     "web/a/partyfuse.txt": "web/a/partyfuse.py",
     "web/a/u2c.txt": "web/a/u2c.py",

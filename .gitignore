@@ -51,3 +51,8 @@ result-*
 
 # IDEA config
 .idea/
+
+# custom frontend
+copyparty/web/vue/
+copyparty/_vue_assets.py
+scripts/sfx-vue.ls

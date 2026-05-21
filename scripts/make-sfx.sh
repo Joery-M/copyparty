@@ -443,7 +443,7 @@ rm -f \
 
 find copyparty | LC_ALL=C sort | sed -r 's/\.gz$//;s/$/,/' > have
 cat have | while IFS= read -r x; do
-	grep -qF -- "$x" ../scripts/sfx.ls || {
+	grep -qF -- "$x" ../scripts/sfx.ls ../scripts/sfx-vue.ls || {
 		echo "unexpected file: $x"
 		exit 1
 	}

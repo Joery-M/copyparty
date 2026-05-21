@@ -184,12 +184,10 @@ class HttpSrv(object):
         env = jinja2.Environment()
         env.loader = jinja2.FunctionLoader(lambda f: load_jinja2_resource(self.E, f))
         jn = [
-            "browser",
+            "vue/index",
             "browser2",
             "cf",
             "idp",
-            "md",
-            "mde",
             "msg",
             "rups",
             "shares",
