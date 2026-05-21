@@ -1514,7 +1514,7 @@ class HttpCli(object):
             if "idp" in self.uparam:
                 return self.tx_idp()
 
-        if "h" in self.uparam:
+        if "h" in self.uparam and "h" in self.ouparam:
             return (
                 self.tx_mounts_json() if self.ouparam["h"] == "j" else self.tx_mounts()
             )
