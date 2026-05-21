@@ -64,7 +64,7 @@ except:
 try:
     from ._vue_assets import VUE_ASSETS
 except:
-    VUE_ASSETS = []
+    VUE_ASSETS = ""
 
 # all embedded resources to be retrievable over http
 zs = """
@@ -120,7 +120,7 @@ web/tl/vie.js
 web/ui.css
 web/util.js
 """
-RES = set(zs.strip().split("\n") + VUE_ASSETS)
+RES = set(zs.strip().split("\n") + VUE_ASSETS.strip().split("\n"))
 RESM = {
     "web/a/partyfuse.txt": "web/a/partyfuse.py",
     "web/a/u2c.txt": "web/a/u2c.py",
