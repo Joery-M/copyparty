@@ -76,7 +76,7 @@ web/browser2.html
 web/cf.html
 web/copyparty.gif
 web/deps/busy.mp3
-web/deps/fuse.py
+web/deps/mfusepy.py
 web/deps/mini-fa.css
 web/deps/mini-fa.woff
 web/deps/scp.woff2
