@@ -1515,9 +1515,10 @@ class HttpCli(object):
                 return self.tx_idp()
 
         if "h" in self.uparam:
-            return (
-                self.tx_mounts_json() if self.ouparam["h"] == "j" else self.tx_mounts()
-            )
+            if self.headers.get("accept") == "application/json":
+                return self.tx_mounts_json()
+            else:
+                return self.tx_mounts()
 
         if "ups" in self.uparam:
             # vpath is used for share translation
