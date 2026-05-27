@@ -2990,6 +2990,11 @@ class HttpCli(object):
                 zds["hash"] = "%d chunks" % (len(body["hash"]),)
             except:
                 zds = body
+            # Hide password from JSON login
+            if "login" in self.uparam and "pwd" in zds:
+                zds = copy.copy(zds)
+                zds["pwd"] = "********"
+
             t = "POST len=%d type=%s ip=%s user=%s req=%r json=%s"
             self.log(t % (len(json_buf), enc, self.ip, self.uname, self.req, zds))
         except:
