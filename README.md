@@ -836,6 +836,7 @@ you can also zip a selection of files or folders by clicking them in the browser
 
 cool trick: download a folder by appending url-params `?tar&opus` or `?tar&mp3` to transcode all audio files (except aac|m4a|mp3|ogg|opus|wma) to opus/mp3 before they're added to the archive
 * super useful if you're 5 minutes away from takeoff and realize you don't have any music on your phone but your server only has flac files and downloading those will burn through all your data + there wouldn't be enough time anyways
+* and url-param `&name=foo` changes the name of the toplevel folder in the archive to `foo`, and just `&name` removes the folder entirely
 * and url-param `&nodot` skips dotfiles/dotfolders; they are included by default if your account has permission to see them
 * and url-params `&j` / `&w` produce jpeg/webm thumbnails/spectrograms instead of the original audio/video/images (`&p` for audio waveforms)
   * can also be used to pregenerate thumbnails; combine with `--th-maxage=9999999` or `--th-clean=0`
@@ -1769,7 +1770,7 @@ avoid traversing into other filesystems  using `--xdev` / volflag `:c,xdev`, ski
 
 and/or you can `--xvol` / `:c,xvol` to ignore all symlinks leaving the volume's top directory, but still allow bind-mounts pointing elsewhere
 
-* symlinks are permitted with `xvol` if they point into another volume where the user has the same level of access
+* symlinks are permitted with `xvol` if they point into another volume where the user also has some sort of access, keeping permissions from outer/initial volume
 
 these options will reduce performance; unlikely worst-case estimates are 14% reduction for directory listings, 35% for download-as-tar
 
@@ -3224,6 +3225,8 @@ enable [smb](#smb-server) support (**not** recommended): `impacket==0.13.0`
 * to install `pyvips` on windows: `pip install --user -U "pyvips[binary]"`
 
 to install FFmpeg on Windows, grab [a recent build](https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z) -- you need `ffmpeg.exe` and `ffprobe.exe` from inside the `bin` folder; copy them into `C:\Windows\System32` or any other folder that's in your `%PATH%`
+
+if your ffmpeg/ffprobe binaries have nonstandard names -- such as `ffmpeg8` (macports) -- set environment variables `PRTY_FFMPEG_BIN` and `PRTY_FFPROBE_BIN` to the corret name (or full path)
 
 
 ### dependency chickenbits

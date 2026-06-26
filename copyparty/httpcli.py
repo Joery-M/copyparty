@@ -123,6 +123,7 @@ from .util import (
     unescape_cookie,
     unquotep,
     vjoin,
+    vjoins,
     vol_san,
     vroots,
     vsplit,
@@ -1514,10 +1515,11 @@ class HttpCli(object):
             if "idp" in self.uparam:
                 return self.tx_idp()
 
-        if "h" in self.uparam and "h" in self.ouparam:
-            return (
-                self.tx_mounts_json() if self.ouparam["h"] == "j" else self.tx_mounts()
-            )
+        if "h" in self.uparam:
+            if self.headers.get("accept") == "application/json":
+                return self.tx_mounts_json()
+            else:
+                return self.tx_mounts()
 
         if "ups" in self.uparam:
             # vpath is used for share translation
@@ -1825,14 +1827,13 @@ class HttpCli(object):
             # because lstat=true would not recurse into subfolders
             # and this is a rare case where we actually want that
             fgen = vn.zipgen(
-                rem,
+                "",
                 rem,
                 set(),
                 self.uname,
                 True,
                 1,
                 not self.args.no_scandir,
-                wrap=False,
             )
 
         elif depth == "0":
@@ -1922,7 +1923,7 @@ class HttpCli(object):
             df = {}
 
         fgen = itertools.chain([topdir], fgen)
-        vtop = vjoin(self.args.R, vjoin(vn.vpath, rem))
+        vtop = vjoins(self.args.R, vn.vpath, rem)
 
         chunksz = 0x7FF8  # preferred by nginx or cf (dunno which)
 
@@ -5227,6 +5228,16 @@ class HttpCli(object):
         if items:
             fn = "sel-" + fn
 
+        if "name" in self.ouparam:
+            # user-selected name for toplevel folder, or blank for none
+            vpath = undot(self.ouparam["name"])
+        elif items:
+            # multiselect; add all items to archive root
+            vpath = ""
+        else:
+            # single folder; the folder itself is the top-level item
+            vpath = vpath.split("/")[-1].lstrip(".") or "top"
+
         if vn.flags.get("zipmax") and not (
             vn.flags.get("zipmaxu") and self.uname != "*"
         ):
@@ -5273,7 +5284,7 @@ class HttpCli(object):
 
             if cfmt:
                 self.log("transcoding to [{}]".format(cfmt))
-                fgen = gfilter(fgen, self.thumbcli, self.uname, vpath, cfmt)
+                fgen = gfilter(fgen, self.thumbcli, self.uname, self.vpath, vpath, cfmt)
 
         now = time.time()
         self.dl_id = "%s:%s" % (self.ip, self.addr[1])
@@ -7616,10 +7627,10 @@ class HttpCli(object):
             if doctxt is not None:
                 j2a["doc"] = doctxt
 
+        dirs.sort(key=itemgetter("name"))
+
         for d in dirs:
             d["name"] += "/"
-
-        dirs.sort(key=itemgetter("name"))
 
         if is_opds:
             # OpenSearch Description format requires a full-qualified URL and a "Short Name" under 16 characters
