@@ -79,6 +79,7 @@ web/deps/busy.mp3
 web/deps/mfusepy.py
 web/deps/mini-fa.css
 web/deps/mini-fa.woff
+web/deps/orbitron.woff2
 web/deps/scp.woff2
 web/idp.html
 web/iiam.gif
