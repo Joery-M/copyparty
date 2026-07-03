@@ -443,6 +443,7 @@ class VFS(object):
         self.adot: dict[str, list[str]] = {}
         self.js_ls = {}
         self.js_htm = ""
+        self.md_htm = ""
         self.all_vols: dict[str, VFS] = {}  # flattened recursive
         self.all_nodes: dict[str, VFS] = {}  # also jumpvols/shares
         self.all_fvols: dict[str, VFS] = {}  # volumes which are files
@@ -2640,17 +2641,22 @@ class AuthSrv(object):
             if head_s and not head_s.endswith("\n"):
                 head_s += "\n"
 
+            zs = vol.flags.get("csp_ui", "")
+            csp_ui = "Content-Security-Policy: %s\r\n" % (zs,) if zs else ""
+            zs = vol.flags.get("csp_dl", "")
+            csp_dl = "Content-Security-Policy: %s\r\n" % (zs,) if zs else ""
+
             zs = "X-Content-Type-Options: nosniff\r\n"
             if "norobots" in vol.flags:
                 head_s += META_NOBOTS
                 zs += "X-Robots-Tag: noindex, nofollow\r\n"
             if self.args.http_vary:
                 zs += "Vary: %s\r\n" % (self.args.http_vary,)
-            vol.flags["oh_g"] = zs + "\r\n"
+            vol.flags["oh_g"] = zs + csp_ui + "\r\n"
 
             if "noscript" in vol.flags:
-                zs += "Content-Security-Policy: script-src 'none';\r\n"
-            vol.flags["oh_f"] = zs + "\r\n"
+                csp_dl = "Content-Security-Policy: script-src 'none';\r\n"
+            vol.flags["oh_f"] = zs + csp_dl + "\r\n"
 
             ico_url = vol.flags.get("ufavico")
             if ico_url:
@@ -3193,7 +3199,7 @@ class AuthSrv(object):
             db.close()
 
         self.js_ls = {}
-        self.js_htm = {}
+        self.js_htm = ""
         for vp, vn in self.vfs.all_nodes.items():
             if enshare and vp.startswith(shrs):
                 continue  # propagates later in this func
@@ -3285,7 +3291,13 @@ class AuthSrv(object):
                 zs2 = getattr(self.args, zs, "")
                 if zs2:
                     js_htm[zs] = zs2
+
+            zs = "have_emp md_no_br"
+            md_htm = {x: js_htm[x] for x in zs.split(" ")}
+            md_htm["modpoll_freq"] = self.args.mcr
+
             vn.js_htm = json_hesc(json.dumps(js_htm))
+            vn.md_htm = json_hesc(json.dumps(md_htm))
 
         vols = list(vfs.all_nodes.values())
         if enshare:
