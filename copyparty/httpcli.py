@@ -4237,6 +4237,16 @@ class HttpCli(object):
                     pass
             if dp:
                 atomic_move(self.log, fp, os.path.join(dp, mfile2), vfs.flags)
+                nmax = dbv.flags["md_nhist"]
+                if nmax:
+                    zs = r"%s\.[0-9]+\.[0-9]{3}\.%s"
+                    ptn = re.compile(zs % (re.escape(fname), re.escape(fext)))
+                    zsl = [x for x in os.listdir(dp) if ptn.match(x)]
+                    zsl.sort(reverse=True)
+                    while len(zsl) > nmax:
+                        zs = os.path.join(dp, zsl.pop())
+                        self.log("rm %r" % (zs,))
+                        wunlink(self.log, zs, vfs.flags)
 
         assert self.parser.gen  # !rm
         p_field, _, p_data = next(self.parser.gen)
@@ -7350,7 +7360,7 @@ class HttpCli(object):
         # [num-backups, most-recent, hist-path]
         hist: dict[str, tuple[int, float, str]] = {}
         try:
-            if vf["md_hist"] != "s":
+            if "show_hist" not in vf or vf["md_hist"] != "s":
                 raise Exception()
             histdir = os.path.join(fsroot, ".hist")
             ptn = RE_MDV
