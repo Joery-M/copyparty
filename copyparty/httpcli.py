@@ -7159,6 +7159,7 @@ class HttpCli(object):
             self.log("#wow #whoa")
 
         zi = vn.flags["du_iwho"]
+        free, total = (None,None)
         if zi and (
             zi == 9
             or (zi == 7 and self.uname != "*")
@@ -7236,6 +7237,7 @@ class HttpCli(object):
             "files": [],
             "taglist": [],
             "srvinf": srv_infot,
+            "du": [free, total],
             "acct": self.uname,
             "perms": perms,
             "cfg": vn.js_ls,
