@@ -1,5 +1,5 @@
 # coding: utf-8
-from __future__ import print_function, unicode_literals
+from __future__ import division, print_function, unicode_literals
 
 # awk -F\" '/add_argument\("-[^-]/{print(substr($2,2))}' copyparty/__main__.py | sort | tr '\n' ' '
 zs = "a c e2d e2ds e2dsa e2t e2ts e2tsr e2v e2vp e2vu ed emp i j lo mcr mte mth mtm mtp nb nc nid nih nth nw p q s ss sss v z zv"
@@ -157,6 +157,7 @@ def vf_vmap() -> dict[str, str]:
         "tail_tmax",
         "tail_who",
         "tcolor",
+        "th_covers",
         "th_pregen",
         "th_qv",
         "th_qvx",
@@ -321,6 +322,7 @@ flagcats = {
         "th3x": "3x resolution (y/n/fy/fn)",
         "th_qv=40": "webp/jpg thumbnail quality (10~90)",
         "th_qvx=40": "jxl thumbnail quality (10~90)",
+        "th_covers=a.jpg,a.png": "filenames to prefer as folder-thumbs",
         "convt": "convert-to-image timeout in seconds",
         "aconvt": "convert-to-audio timeout in seconds",
         "th_spec_p=1": "make spectrograms? 0=never 1=fallback 2=always",
@@ -367,6 +369,8 @@ flagcats = {
         "epilogues=.epilogue.html": "files to embed below/after files",
         "readmes=readme.md,README.md": "files to embed as readmes",
         "preadmes=preadme.md,PREADME.md": "files to embed as preadmes",
+        "plainreadme": "embed readme/preadme as monospace plaintext",
+        "plainlogues": "embed prologue/epilogue as sans-serif plaintext",
         "no_readme": "disable embedding readme/preadme",
         "no_logues": "disable embedding prologue/epilogue",
         "no_sb_md": "disable js sandbox for markdown files",
