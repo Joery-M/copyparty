@@ -341,23 +341,6 @@ def ensure_locale() -> None:
     t = "setlocale {} failed,\n  sorting and dates might get funky\n"
     warn(t.format(safe))
 
-
-def ensure_webdeps() -> None:
-    if has_resource(E, "web/deps/mini-fa.woff"):
-        return
-
-    t = """could not find webdeps;
-  if you are running the sfx, or exe, or pypi package, or docker image,
-  then this is a bug! Please let me know so I can fix it, thanks :-)
-  %s
-
-  however, if you are a dev, or running copyparty from source, and you want
-  full client functionality, you will need to build or obtain the webdeps:
-  %s/blob/hovudstraum/docs/devnotes.md#building
-    """
-    warn(t % (URL_BUG, URL_PRJ))
-
-
 def configure_ssl_ver(al: argparse.Namespace) -> None:
     def terse_sslver(txt: str) -> str:
         txt = txt.lower()
@@ -2218,8 +2201,6 @@ def main(argv: Optional[list[str]] = None) -> None:
             break
 
     ensure_locale()
-
-    ensure_webdeps()
 
     argv = expand_cfg(argv)
 
