@@ -219,6 +219,8 @@ other places to download copyparty from  (non-github links):
   * https://copyparty.eu/enz = https://copyparty.eu/copyparty-en.pyz = the enterprise pyz
   * https://copyparty.eu/cli = online cli helptext
 
+DO NOT download from [sourceforge](https://copyparty.eu/unsanctioned/sourceforge.txt)
+
 
 ### at home
 
@@ -526,6 +528,7 @@ upgrade notes
 per-folder, per-user permissions  - if your setup is getting complex, consider making a [config file](./docs/example.conf) instead of using arguments
 * much easier to manage, and you can modify the config at runtime with `systemctl reload copyparty` or more conveniently using the `[reload cfg]` button in the control-panel (if the user has `a`/admin in any volume)
   * changes to the `[global]` config section requires a restart to take effect
+* when using config-files, ignore all the `-a` and `-v` stuff below, and CTRL-F `config file example` on this page instead
 
 a quick summary can be seen using [`--help-accounts`](https://copyparty.eu/cli/#accounts-help-page)
 
@@ -569,11 +572,13 @@ if you want to grant access to all users who are logged in, the group `acct` wil
 * to do the opposite, granting access to everyone who is NOT logged in. `*,-@acct` does the trick, for example `-v /srv/welcome:welcome:r,*,-@acct`
 * single users can also be subtracted from a group: `@admins,-james`
 
-anyone trying to bruteforce a password gets banned according to `--ban-pw`; default is 24h ban for 9 failed attempts in 1 hour
+anyone trying to bruteforce a password gets banned according to `--ban-pw` (assuming [real-ip](#real-ip) is configured correctly); default is 24h ban for 9 failed attempts in 1 hour
 
 and if you want to use config files instead of commandline args (good!) then here's the same examples as a configfile; save it as `foobar.conf` and use it like this: `python copyparty-sfx.py -c foobar.conf`
 
 * you can also `PRTY_CONFIG=foobar.conf python copyparty-sfx.py` (convenient in docker etc)
+
+config file example:
 
 ```yaml
 [accounts]
@@ -616,6 +621,8 @@ and if you want to use config files instead of commandline args (good!) then her
 ## shadowing
 
 hiding specific subfolders  by mounting another volume on top of them
+
+> **WARNING:** shadowing is NOT bulletproof when the underlying filesystem is casefolding (case-insensitive), in other words DON'T rely on this when copyparty is running on Windows and/or MacOS. This is also unsafe when combined with certain filesystems on Linux, especially FAT32/exFAT. Pay attention to the volume-listing in the startup log; `casechk:n` indicates probably-OK, but if it says `casechk:y` then DO NOT trust shadowing to fully prevent access to a file/subfolder.
 
 for example `-v /mnt::r -v /var/empty:web/certs:` (note: no permissions) mounts the server folder `/mnt` as the webroot, but another volume is mounted at `/web/certs` -- so visitors can only see the contents of `/mnt` and `/mnt/web` (at URLs `/` and `/web`), but not `/mnt/web/certs` because URL `/web/certs` is mapped to `/var/empty`
 
@@ -1798,11 +1805,16 @@ avoid traversing into other filesystems  using `--xdev` / volflag `:c,xdev`, ski
 
 and/or you can `--xvol` / `:c,xvol` to ignore all symlinks leaving the volume's top directory, but still allow bind-mounts pointing elsewhere
 
-* symlinks are permitted with `xvol` if they point into another volume where the user also has some sort of access, keeping permissions from outer/initial volume
+* symlinks are permitted with `xvol` if they point into another volume where the user also has some sort of access
+  * usually keeps permissions from outer/initial volume, but don't take that for granted
 
-these options will reduce performance; unlikely worst-case estimates are 14% reduction for directory listings, 35% for download-as-tar
+these options will reduce performance; unlikely worst-case estimates are 27% reduction for directory listings, 35% for download-as-tar
+
+* if the underlying storage is [a network disk](#using-the-cloud-as-storage) then xvol/xdev will be **very** slow (not to mention pointless/useless)
 
 as of copyparty v1.7.0 these options also prevent file access at runtime -- in previous versions it was just hints for the indexer
+
+> **WARNING:** the `xvol` and `xdev` options should NOT be relied on for security; these are originally and primarily intended for the [e2ds indexer](#file-indexing). Certain underlying filesystems (especially FUSE-based and casefolding ones) will be problematic, and symlinks inherently have various TOCTOUs, and there's probably also bugs in copyparty where xvol/xdev is not fully enforced for certain APIs. The developer does not care about these options and they do not receive much testing.
 
 ### periodic rescan
 
@@ -2195,7 +2207,7 @@ as for client-side stuff, there is [plugins for modifying UI/UX](./contrib/plugi
 
 autologin based on IP range (CIDR)  , using the global-option `--ipu`
 
-for example, if everyone with an IP that starts with `192.168.123` should automatically log in as the user `spartacus`, then you can either specify `--ipu=192.168.123.0/24=spartacus` as a commandline option, or put this in a config file:
+for example, if everyone with an IP that starts with `192.168.123` should automatically log in as the user `spartacus`, then you can either specify `--ipu=192.168.123.0/24=spartacus` as a commandline option, same as this config file example:
 
 ```yaml
 [global]
@@ -2211,7 +2223,7 @@ repeat the option to map additional subnets
 
 limit a user to certain IP ranges (CIDR)  , using the global-option `--ipr`
 
-for example, if the user `spartacus` should get rejected if they're not connecting from an IP that starts with `192.168.123` or `172.16`, then you can either specify `--ipr=192.168.123.0/24,172.16.0.0/16=spartacus` as a commandline option, or put this in a config file:
+for example, if the user `spartacus` should get rejected if they're not connecting from an IP that starts with `192.168.123` or `172.16`, then you can either specify `--ipr=192.168.123.0/24,172.16.0.0/16=spartacus` as a commandline option, same as this config file example:
 
 ```yaml
 [global]
@@ -2248,7 +2260,7 @@ but if you just want to let users change their own passwords, then you probably 
 
 other ways to auth by header
 
-if you have a middleware which adds a header with a user identifier, for example tailscale's `Tailscale-User-Login: alice.m@forest.net` then you can automatically auth as `alice` by defining that mapping with `--idp-hm-usr '^Tailscale-User-Login^alice.m@forest.net^alice'` or the following config file:
+if you have a middleware which adds a header with a user identifier, for example tailscale's `Tailscale-User-Login: alice.m@forest.net` then you can automatically auth as `alice` by defining that mapping with `--idp-hm-usr '^Tailscale-User-Login^alice.m@forest.net^alice'` or the following config file example:
 
 ```yaml
 [global]
@@ -2569,7 +2581,7 @@ change the association of a file extension
 
 using commandline args, you can do something like `--mime gif=image/jif` and `--mime ts=text/x.typescript` (can be specified multiple times)
 
-in a config file, this is the same as:
+that's the same as this config file example:
 
 ```yaml
 [global]
@@ -2636,7 +2648,7 @@ if your distro/OS is not mentioned below, there might be some hints in the [«on
 
 `pacman -S copyparty` (in [arch linux extra](https://archlinux.org/packages/extra/any/copyparty/))
 
-it comes with a [systemd service](./contrib/systemd/copyparty@.service) as well as a [user service](./contrib/systemd/copyparty-user.service), and expects to find a [config file](./contrib/systemd/copyparty.example.conf) in `/etc/copyparty/copyparty.conf` or `~/.config/copyparty/copyparty.conf`
+it comes with a [systemd service](./contrib/systemd/copyparty@.service) as well as a [user service](./contrib/systemd/copyparty-user.service), and expects to find a [config file](./contrib/systemd/copyparty.example.conf) in `/etc/copyparty.conf` or `~/.config/copyparty/copyparty.conf`
 
 after installing, start either the system service or the user service and navigate to http://127.0.0.1:3923 for further instructions (unless you already edited the config files, in which case you are good to go, probably)
 
@@ -3042,7 +3054,7 @@ below are some tweaks roughly ordered by usefulness:
   * and pypy can sometimes crash on startup with `-j0` (TODO make issue)
 
 * if you are running the copyparty server **on Windows or Macos:**
-  * `--casechk=n` makes it much faster, but also awakens [the usual surprises](https://github.com/9001/copyparty/issues/781) you expect from a case-insensitive filesystem
+  * `--casechk=n` makes it much faster, but [reduces security](https://github.com/9001/copyparty/security/advisories/GHSA-3c88-p299-7hvr) and awakens [the usual surprises](https://github.com/9001/copyparty/issues/781) you expect from a case-insensitive filesystem
     * this is the same as `casechk: n` in a config-file
 
 

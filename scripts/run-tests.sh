@@ -1,6 +1,8 @@
 #!/bin/bash
 set -ex
 
+export PRTY_NO_VIPS=1
+
 if uname | grep -iE '^(msys|mingw)'; then
     pids=()
 
@@ -67,6 +69,9 @@ done
 
 [ "$1" ] || {
     python3 ../scripts/test/smoketest.py &
+    pids+=($!)
+
+    bash ../scripts/test/redup.sh &
     pids+=($!)
 }
 

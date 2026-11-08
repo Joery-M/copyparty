@@ -8,7 +8,6 @@ import os
 import select
 import socket
 import time
-from threading import ExceptHookArgs
 
 import paramiko
 import paramiko.common
@@ -38,7 +37,6 @@ from .util import (
     ipnorm,
     min_ex,
     read_utf8,
-    relchk,
     runhook,
     sanitize_fn,
     ub64enc,
@@ -54,6 +52,23 @@ if True:  # pylint: disable=using-constant-test
     from typing import Any, BinaryIO, Optional, Union
 
 SATTR = paramiko.sftp_attr.SFTPAttributes
+
+
+try:
+    from paramiko.rsakey import serialization
+
+    _load_der_pk = serialization.load_der_private_key
+
+    def fastloader(*a, **ka):
+        ka0 = ka.copy()
+        try:
+            ka["unsafe_skip_rsa_key_validation"] = True
+            return _load_der_pk(*a, **ka)
+        except:
+            return _load_der_pk(*a, **ka0)
+
+except:
+    pass
 
 
 class SSH_Srv(paramiko.ServerInterface):
@@ -296,6 +311,17 @@ class SFTP_Srv(paramiko.SFTPServerInterface):
         if self.uname == LEELOO_DALLAS:
             raise Exception("send her back")
 
+        cm = 0
+        for zs, zi in (
+            ("s", SATTR.FLAG_SIZE),
+            ("t", SATTR.FLAG_AMTIME),
+            ("p", SATTR.FLAG_PERMISSIONS),
+            ("u", SATTR.FLAG_UIDGID),
+        ):
+            if zs in self.args.sftp_chattr:
+                cm |= zi
+        self.chattr_mask = cm
+
         self.vols = [
             vp
             for vp, vn in self.asrv.vfs.all_vols.items()
@@ -321,15 +347,23 @@ class SFTP_Srv(paramiko.SFTPServerInterface):
         m: bool = False,
         d: bool = False,
     ) -> tuple[str, VFS, str]:
-        vpath = vpath.replace(os.sep, "/").strip("/")
-        rd, fn = os.path.split(vpath)
-        if relchk(rd):
-            self.log("malicious vpath: %s", vpath)
-            raise Exception("Unsupported characters in [%s]" % (vpath,))
+        # because:
+        #  * maybe some clients use \
+        #  * windows filename limitations
+        # need to allow/translate illegal fn,
+        # but require filesystem-correct rd
+        if ANYWIN or ("\\" in vpath and "/" not in vpath):
+            vpath = vpath.replace("\\", "/")
+        vpath = vpath.strip("/\\")
+        if ANYWIN:
+            rd, fn = os.path.split(vpath)
+            fn = sanitize_fn(fn, "win")
+            vpath = vjoin(rd, fn)
+        # end of windows jank
 
-        fn = sanitize_fn(fn or "")
-        vpath = vjoin(rd, fn)
         vn, rem = self.hub.asrv.vfs.get(vpath, self.uname, r, w, m, d)
+        vpath = vjoin(vn.vpath, rem)
+        rd, fn = os.path.split(vpath)
         if (
             w
             and fn.lower() in vn.flags["emb_all"]
@@ -344,18 +378,7 @@ class SFTP_Srv(paramiko.SFTPServerInterface):
             # return "", vn, rem
             raise OSError(errno.ENOENT, "no filesystem mounted at [/%s]" % (vpath,))
 
-        if "xdev" in vn.flags or "xvol" in vn.flags:
-            ap = vn.canonical(rem)
-            avn = vn.chk_ap(ap)
-            t = "Permission denied in [{}]"
-            if not avn:
-                raise OSError(errno.EPERM, "permission denied in [/%s]" % (vpath,))
-
-            cr, cw, cm, cd, _, _, _, _, _ = avn.uaxs[self.uname]
-            if r and not cr or w and not cw or m and not cm or d and not cd:
-                raise OSError(errno.EPERM, "permission denied in [/%s]" % (vpath,))
-        else:
-            ap = vn.canonical(rem, False)
+        ap = vn.canonical(rem, False)
 
         if "bcasechk" in vn.flags and not vn.casechk(rem, True):
             raise OSError(errno.ENOENT, "file does not exist case-sensitively")
@@ -496,8 +519,7 @@ class SFTP_Srv(paramiko.SFTPServerInterface):
             smode = "rb"
 
         try:
-            vn, rem = self.asrv.vfs.get(vp, self.uname, rd, wr)
-            ap = vn.canonical(rem, False)
+            ap, vn, rem = self.v2a(vp, rd, wr)
             vf = vn.flags
         except Pebkac as ex:
             t = "denied open file [%s], iflag=%s, read=%s, write=%s: %s"
@@ -669,8 +691,7 @@ class SFTP_Srv(paramiko.SFTPServerInterface):
     def _mkdir(self, vp: str, attr: SATTR) -> int:
         self.log("mkdir(%s)" % (vp,))
         try:
-            vn, rem = self.asrv.vfs.get(vp, self.uname, False, True)
-            ap = vn.canonical(rem, False)
+            ap, vn, _ = self.v2a(vp, w=True)
             bos.makedirs(ap, vf=vn.flags)  # filezilla expects this
             if attr is not None:
                 paramiko.SFTPServer.set_file_attr(ap, attr)
@@ -693,8 +714,7 @@ class SFTP_Srv(paramiko.SFTPServerInterface):
     def _rmdir(self, vp: str) -> int:
         self.log("rmdir(%s)" % (vp,))
         try:
-            vn, rem = self.asrv.vfs.get(vp, self.uname, False, False, will_del=True)
-            ap = os.path.join(vn.realpath, rem)
+            ap, _, _ = self.v2a(vp, d=True)
             bos.rmdir(ap)
             return SFTP_OK
         except Pebkac as ex:
@@ -715,8 +735,8 @@ class SFTP_Srv(paramiko.SFTPServerInterface):
     def _chattr(self, vp: str, attr: SATTR) -> int:
         self.log("chattr(%s, %s)" % (vp, attr))
         try:
-            vn, rem = self.asrv.vfs.get(vp, self.uname, False, True, will_del=True)
-            ap = os.path.join(vn.realpath, rem)
+            attr._flags &= self.chattr_mask
+            ap, _, _ = self.v2a(vp, w=True, d=True)
             paramiko.SFTPServer.set_file_attr(ap, attr)
             return SFTP_OK
         except Pebkac as ex:
@@ -776,6 +796,10 @@ class Sftpd(object):
             self.log("cannot start sftp-server; no compatible IPs in -i", 1)
             return
 
+        if args.sftp_fastldr:
+            serialization.load_der_private_key = fastloader  # type: ignore
+        else:
+            self.log("loading hostkeys...")
         self.hostkeys = []
         hostkeytypes = (
             ("ed25519", "Ed25519Key", {}),  # best
@@ -803,6 +827,8 @@ class Sftpd(object):
             self.hostkeys.append(pkey)
             if args.sftpv:
                 self.log("loaded hostkey %r" % (pkey,))
+        if args.sftp_fastldr:
+            serialization.load_der_private_key = _load_der_pk  # type: ignore
 
         ips = list(ODict.fromkeys(ips))  # dedup
 
