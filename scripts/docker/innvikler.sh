@@ -38,6 +38,14 @@ f=/z/whl/zlib_ng-0.5.1-cp312-cp312-linux_$(cat /etc/apk/arch).whl
 }
 rm -rf /z/whl
 
+# drop openjpeg; unmaintained, has vulns
+(cd /usr/lib/python3.*/site-packages/PIL
+  sed -ri /jpg_2000/d features.py
+  sed -ri /Jpeg2KIm/d __init__.py
+  sed -ri /Jpeg2KIm/d Image.py
+  rm -f Jpeg2KImagePlugin.py
+) || true
+
 # cleanup for flavors with python build steps (dj/iv)
 rm -rf /var/cache/apk/* /root/.cache
 
@@ -72,7 +80,7 @@ exec /usr/bin/python3 -m copyparty "$@"
 EOF
 
 # unpack sfx and dive in
-python3 copyparty-sfx.py --version
+PRTY_XD=/tmp python3 copyparty-sfx.py --version
 cd /tmp/pe-copyparty.0
 
 # steal the stuff we need

@@ -10,7 +10,6 @@ import hashlib
 import hmac
 import json
 import logging
-import math
 import mimetypes
 import os
 import platform
@@ -180,12 +179,16 @@ try:
             raise ImportError()
 
         from .stolen.ifaddr import get_adapters
+
+        IFADDR_VND = True
     except ImportError:
+        IFADDR_VND = False
         from ifaddr import get_adapters
 
     HAVE_IFADDR = True
 except:
     HAVE_IFADDR = False
+    IFADDR_VND = False
 
     def get_adapters(include_unconfigured=False):
         return []
@@ -195,10 +198,10 @@ try:
     if os.environ.get("PRTY_NO_SQLITE"):
         raise Exception()
 
-    HAVE_SQLITE3 = True
     import sqlite3
 
     assert hasattr(sqlite3, "connect")  # graalpy
+    HAVE_SQLITE3 = True
 except:
     HAVE_SQLITE3 = False
 
@@ -213,8 +216,9 @@ try:
     if os.environ.get("PRTY_NO_PSUTIL"):
         raise Exception()
 
-    HAVE_PSUTIL = True
     import psutil
+
+    HAVE_PSUTIL = True
 except:
     HAVE_PSUTIL = False
 
@@ -225,8 +229,10 @@ try:
         raise Exception()
 
     import magic
+
+    HAVE_MAGIC = True
 except:
-    pass
+    HAVE_MAGIC = False
 
 if os.environ.get("PRTY_MODSPEC"):
     from inspect import getsourcefile
@@ -283,7 +289,6 @@ try:
         raise Exception()
 
     socket.inet_pton(socket.AF_INET6, "::1")
-    HAVE_IPV6 = True
 
     if GRAAL:
         try:
@@ -298,13 +303,15 @@ try:
                 return _inet_pton(fam, ip)
 
             socket.inet_pton = inet_pton
+
+    HAVE_IPV6 = True
 except:
+    HAVE_IPV6 = False
 
     def inet_pton(fam, ip):
         return socket.inet_aton(ip)
 
     socket.inet_pton = inet_pton
-    HAVE_IPV6 = False
 
 
 try:
@@ -358,13 +365,19 @@ if PY2:
 else:
     umktrans = str.maketrans
 
-FNTL_WIN = umktrans('<>:|?*"\\/', "＜＞：｜？＊＂＼／")
 VPTL_WIN = umktrans('<>:|?*"\\', "＜＞：｜？＊＂＼")
-APTL_WIN = umktrans('<>:|?*"/', "＜＞：｜？＊＂／")
-FNTL_MAC = VPTL_MAC = APTL_MAC = umktrans(":", "：")
-FNTL_OS = FNTL_WIN if ANYWIN else FNTL_MAC if MACOS else None
+VPTL_MAC = umktrans(":", "：")
 VPTL_OS = VPTL_WIN if ANYWIN else VPTL_MAC if MACOS else None
-APTL_OS = APTL_WIN if ANYWIN else APTL_MAC if MACOS else None
+
+
+BADNAMES = []
+if ANYWIN:
+    BADNAMES += ["con", "prn", "aux", "nul"]
+    BADNAMES += ["com%s" % (n,) for n in range(1, 10)]
+    BADNAMES += ["lpt%s" % (n,) for n in range(1, 10)]
+    BADNAMES += ["com%s" % (n,) for n in ("¹", "²", "³")]
+    BADNAMES += ["lpt%s" % (n,) for n in ("¹", "²", "³")]
+BADNAMESET = set(BADNAMES)
 
 
 BOS_SEP = ("%s" % (os.sep,)).encode("ascii")
@@ -445,6 +458,7 @@ IMPLICATIONS = [
     ["no_logue", "no_logues"],  # user-typo
     ["nologues", "no_logues"],  # user-typo
     ["nologue", "no_logues"],  # user-typo
+    ["nw", "redup_dry"],
     ["plainlogue", "plainlogues"],  # user-typo
     ["plainreadmes", "plainreadme"],  # user-typo
     ["noscript", "plainlogues"],
@@ -455,6 +469,8 @@ IMPLICATIONS = [
     ["smbvvv", "smbvv"],
     ["smbvv", "smbv"],
     ["smbv", "smb"],
+    ["xdev", "xvd"],
+    ["xvol", "xvd"],
     ["zv", "zmv"],
     ["zv", "zsv"],
     ["z", "zm"],
@@ -2217,7 +2233,7 @@ def read_header(sr: Unrecv, t_idle: int, t_tot: int) -> list[str]:
             raise Pebkac(
                 400,
                 "protocol error while reading headers",
-                log=ret.decode("utf-8", "replace"),
+                log=repr(ret.decode("utf-8", "replace")),
             )
 
         ofs = ret.find(b"\r\n\r\n")
@@ -2421,7 +2437,7 @@ def uncyg(path: str) -> str:
     return "%s:\\%s" % (path[1], path[3:])
 
 
-def undot(path: str) -> str:
+def _undot(path: str) -> str:
     ret: list[str] = []
     for node in path.split("/"):
         if node == "." or not node:
@@ -2437,30 +2453,56 @@ def undot(path: str) -> str:
     return "/".join(ret)
 
 
-def sanitize_fn(fn: str) -> str:
-    fn = fn.replace("\\", "/").split("/")[-1]
-    if APTL_OS:
-        fn = sanitize_to(fn, APTL_OS)
+def _undot_win(path: str) -> str:
+    ret: list[str] = []
+    for node in path.replace("\\", "/").split("/"):
+        if node == "..":
+            if ret:
+                ret.pop()
+            continue
+
+        node = node.rstrip(". ")
+        if node:
+            ret.append(node)
+
+    return "/".join(ret)
+
+
+if ANYWIN:
+    undot = _undot_win
+else:
+    undot = _undot
+
+
+def sanitize_fn(fn: str, fsnt: Optional[str] = None) -> str:
+    fn = fn.replace("\x00", "_").split("/")[-1]
+    if fsnt and fsnt != "lin":
+        fn = fn.translate(VPTL_WIN if fsnt == "win" or ANYWIN else VPTL_MAC)
+    fn2 = fn.replace("\\", "/")
+    if ANYWIN or fsnt == "win" or "/../" in fn2:
+        fn = fn2.split("/")[-1].rstrip(". ")
+    if VPTL_OS:
+        fn = sanitize_to(fn, VPTL_OS)
     return fn.strip()
 
 
-def sanitize_to(fn: str, tl: dict[int, int]) -> str:
+def sanitize_to(fn: str, tl: dict[int, int], fsnt: Optional[str] = None) -> str:
     fn = fn.translate(tl)
-    if ANYWIN:
-        bad = ["con", "prn", "aux", "nul"]
-        for n in range(1, 10):
-            bad += ("com%s lpt%s" % (n, n)).split(" ")
-
-        if fn.lower().split(".")[0] in bad:
+    if ANYWIN or fsnt == "win":
+        fn = fn.rstrip(". ")
+        if fn.lower().split(".")[0].strip() in BADNAMESET:
             fn = "_" + fn
     return fn
 
 
-def sanitize_vpath(vp: str) -> str:
-    if not APTL_OS:
+def sanitize_vpath(vp: str, fsnt: Optional[str] = None) -> str:
+    vptl = VPTL_OS
+    if fsnt and fsnt != "lin":
+        vptl = VPTL_WIN if fsnt == "win" or ANYWIN else VPTL_MAC
+    if not vptl:
         return vp
     parts = vp.replace(os.sep, "/").split("/")
-    ret = [sanitize_to(x, APTL_OS) for x in parts]
+    ret = [sanitize_to(x, vptl, fsnt) for x in parts]
     return "/".join(ret)
 
 
@@ -4044,9 +4086,9 @@ def runihook(
             }
             for x, vp, ap in zip(ups, vps, aps)
         ]
-        sp_ka["sin"] = json.dumps(ja).encode("utf-8", "replace")
+        sp_ka["sin"] = json.dumps(ja).encode("utf-8", "replace") + b"\n"
     else:
-        sp_ka["sin"] = b"\n".join(fsenc(x) for x in aps)
+        sp_ka["sin"] = b"\n".join(fsenc(x) for x in aps) + b"\n"
 
     if acmd[0].startswith("zmq:"):
         try:
@@ -4392,6 +4434,36 @@ def gzip_file_orig_sz(f) -> int:
     rv = f.read(4)
     f.seek(start, 0)
     return sunpack(b"I", rv)[0]  # type: ignore
+
+
+def zip_fi(zf, fp, max_sz):
+    zi = zf.getinfo(fp)
+    if max_sz and zi.file_size > max_sz:
+        raise Pebkac(404, "zip bomb defused")
+    return zi
+
+
+def zip_lim(zi, max_sz):
+    if zi.file_size > max_sz:
+        raise Pebkac(404, "zip bomb defused")
+    return zi
+
+
+def zip_read(zf, zi, max_sz):
+    ret = b""
+    with zf.open(zi) as f:
+        while True:
+            buf = f.read(max_sz)
+            if not buf:
+                break
+            ret += buf
+            if len(ret) >= max_sz:
+                raise Pebkac(404, "zip bomb defused")
+    return ret
+
+
+def zip_readf(zf, zp, max_sz):
+    return zip_read(zf, zip_fi(zf, zp, max_sz), max_sz)
 
 
 def align_tab(lines: list[str]) -> list[str]:

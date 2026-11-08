@@ -583,6 +583,7 @@ if (1)
 		"u_ancient": 'your browser is impressively ancient -- maybe you should <a href="#" id="u2nah">use bup instead</a>',
 		"u_nowork": "need firefox 53+ or chrome 57+ or iOS 11+",
 		"tail_2old": "need firefox 105+ or chrome 71+ or iOS 14.5+",
+		"b2old": 'your browser is too old',
 		"u_nodrop": 'your browser is too old for drag-and-drop uploading',
 		"u_notdir": "that's not a folder!\n\nyour browser is too old,\nplease try dragdrop instead",
 		"u_uri": "to dragdrop images from other browser windows,\nplease drop it onto the big upload button",
@@ -666,6 +667,7 @@ if (1)
 		"rc_pla": "play as audio",
 		"rc_txt": "open in textfile viewer",
 		"rc_md": "open in markdown viewer",
+		"rc_wopi": "open in office editor",
 		"rc_dl": "download",
 		"rc_zip": "download as archive",
 		"rc_cpl": "copy link",
@@ -1112,6 +1114,7 @@ ebi('rcm').innerHTML = (
 	'<a href="#" id="rpla">' + L.rc_pla + '</a>' +
 	'<a href="#" id="rtxt">' + L.rc_txt + '</a>' +
 	'<a href="#" id="rmd">' + L.rc_md + '</a>' +
+	'<a href="#" id="rwopi">' + L.rc_wopi + '</a>' +
 	'<div id="rs1" class="sep"></div>' +
 	'<a href="#" id="rcpl">' + L.rc_cpl + '</a>' +
 	'<a href="#" id="rdl">' + L.rc_dl + '</a>' +
@@ -1246,8 +1249,8 @@ check_image_support('jxl', "data:image/jxl;base64,/woIAAAMABKIAgC4AF3lEgA=");
 
 
 var img_re = APPLE ?
-	/\.(a?png|avif|bmp|gif|hei[cf]s?|jpe?g|jfif|svg|webp|webm|mkv|mp4|m4v|mov|svg)(\?|$)/i :
-	/\.(a?png|avif|bmp|gif|jpe?g|jfif|svg|webp|webm|mkv|mp4|m4v|mov|svg)(\?|$)/i;
+	/\.(a?png|avif|bmp|gif|hei[cf]s?|jpe?g|jfif|jxl|svg|webp|webm|mkv|mp4|m4v|mov)(\?|$)/i :
+	/\.(a?png|avif|bmp|gif|jpe?g|jfif|jxl|svg|webp|webm|mkv|mp4|m4v|mov)(\?|$)/i;
 
 var wopi_set = !window.have_wopi ? null :
 	new Set('odt fodt ott doc docx dotx rtf odm ods fods ots xls xlsx odp fodp otp ppt pptx ppsx odg fodg otg odf'.split(' '));
@@ -3556,7 +3559,7 @@ function eval_hash() {
 	if (hash0 && window.og_fn) {
 		var all = msel.getall(), mi;
 		for (var a = 0; a < all.length; a++)
-			if (og_fn == uricom_dec(vsplit(all[a].vp)[1].split('?')[0])) {
+			if (og_fn == all[a].fn) {
 				mi = all[a];
 				break;
 			}
@@ -4093,7 +4096,7 @@ var fileman = (function () {
 		if (wr)
 			html.push('<a href="#" class="btn">write-only</a>');
 
-		html.push('</td></tr></div');
+		html.push('</td></tr><table></div>');
 		shui.innerHTML = html.join('\n');
 
 		var sh_rand = ebi('sh_rand'),
@@ -4251,9 +4254,6 @@ var fileman = (function () {
 			s2d[a] = all.indexOf(sel[a]);
 
 			var vp = sel[a].vp;
-			if (vp.endsWith('/'))
-				vp = vp.slice(0, -1);
-
 			var vsp = vsplit(vp);
 			if (base != vsp[0])
 				return toast.err(0, esc('bug:\n' + base + '\n' + vsp[0]));
@@ -4572,6 +4572,8 @@ var fileman = (function () {
 			xhr.onload = xhr.onerror = rename_cb;
 			xhr.send();
 		}
+
+		ire.oninput();
 	};
 
 	r.delete = function (e) {
@@ -4597,6 +4599,9 @@ var fileman = (function () {
 			if (!vp) {
 				if (err !== 'xbd')
 					toast.ok(2, L.fd_ok);
+
+				if (QS('#seldoc.sel'))
+					thegrid.setvis(true);
 
 				treectl.goto();
 				return;
@@ -5074,11 +5079,22 @@ var showfile = (function () {
 	r.nmap = {
 		'dockerfile': 'docker'
 	};
+	r.pmap = {
+		'sh': 'bash',
+		'ash': 'bash',
+		'dash': 'bash',
+		'luajit': 'lua',
+		'node': 'js',
+	};
 	var x = txt_ext + ' ans c cfg conf cpp cs css diff glsl go html ini java js json jsx kt kts latex less lisp lua makefile md nasm nim nix py r rss rb ruby sass scss sql svg swift tex toml ts vhdl xml yaml zig';
 	x = x.split(/ +/g);
 	for (var a = 0; a < x.length; a++)
 		if (!r.map["." + x[a]])
 			r.map["." + x[a]] = x[a];
+	x = 'awk bash lua make perl python ruby swift';
+	x = x.split(/ +/g);
+	for (var a = 0; a < x.length; a++)
+		r.pmap[x[a]] = x[a];
 
 	r.sname = function (srch) {
 		return srch.split(/[?&]doc=/)[1].split('&')[0];
@@ -5087,7 +5103,7 @@ var showfile = (function () {
 	if (window.og_fn) {
 		var ext = og_fn.split(/\./g).pop();
 		if (r.map['.' + ext])
-			hist_replace(get_evpath() + '?doc=' + og_fn);
+			hist_replace(get_evpath() + '?doc=' + uricom_enc(og_fn));
 	}
 
 	window.Prism = { 'manual': true };
@@ -5098,7 +5114,7 @@ var showfile = (function () {
 		var m = /[?&]doc=([^&]+)/.exec(location.search);
 		if (m) {
 			setTimeout(function () {
-				r.show(uricom_dec(m[1]), true);
+				r.show(m[1], true);
 			}, 1);
 		}
 	}
@@ -5118,11 +5134,17 @@ var showfile = (function () {
 		return !!/[?&]doc=/.exec(location.search);
 	};
 
-	r.getlang = function (fn) {
+	r.getlang = function (fn, txt) {
 		fn = fn.toLowerCase();
 		var ext = fn.slice(fn.lastIndexOf('.'));
-		return r.map[ext] || r.nmap[fn];
-	}
+		var prog = txt && txt.startsWith('#!') && txt.split('\n')[0].replace(
+			'#!/usr/bin/env', '').replace(
+			'#!/usr/bin/', '').replace(
+			'#!/bin/', '').trim().split(' ')[0];
+		if (prog)
+			prog = r.pmap[prog] || r.pmap[prog.replace(/[0-9].*/, '')];
+		return r.map[ext] || r.nmap[fn] || prog;
+	};
 
 	r.addlinks = function () {
 		r.files = [];
@@ -5135,7 +5157,7 @@ var showfile = (function () {
 			if (!lang)
 				continue;
 
-			r.files.push({ 'id': link.id, 'name': uricom_dec(fn) });
+			r.files.push({ 'id': link.id, 'name': link.fn });
 
 			var ah = ebi(link.id),
 				td = ah.closest('tr').getElementsByTagName('td')[0];
@@ -5271,7 +5293,7 @@ var showfile = (function () {
 			txt = doc[2],
 			name = url.split('?')[0].split('/').pop(),
 			tname = uricom_dec(name),
-			lang = r.getlang(name),
+			lang = r.getlang(name, txt),
 			is_md = lang == 'md';
 
 		ebi('files').style.display = ebi('gfiles').style.display = ebi('lazy').style.display = ebi('pro').style.display = ebi('epi').style.display = 'none';
@@ -5460,7 +5482,7 @@ var showfile = (function () {
 				sel = false;
 
 			for (var b = 0; b < sels.length; b++)
-				if (vsplit(sels[b].vp)[1] == lin)
+				if (sels[b].fn == lin)
 					sel = true;
 
 			clmod(lis[a], 'hl', lin == fn);
@@ -5483,7 +5505,7 @@ var showfile = (function () {
 	r.tgltail = function () {
 		if (!window.TextDecoderStream) {
 			bcfg_set('taildoc', r.taildoc = false);
-			return toast.err(10, L.tail_2old);
+			return toast.err(10, L.b2old + ';\n' + L.tail_2old);
 		}
 		r.show(r.url, true);
 	};
@@ -6439,8 +6461,10 @@ var ahotkeys = function (e) {
 	if (k == 'F2')
 		return fileman.rename();
 
-	if (k == 'F4')
+	if (k == 'F4') {
+		enspin('t', 1);
 		return treectl.goto();
+	}
 
 	if (!treectl.hidden && (!sh || !thegrid.en)) {
 		if (kl == 'a')
@@ -7995,12 +8019,12 @@ var treectl = (function () {
 })();
 
 
-function enspin(i) {
+function enspin(i, ns) {
 	i = 'dlt_' + i;
 	if (ebi(i))
 		return;
 	var d = mknod('div', i, SPINNER);
-	d.className = 'dumb_loader_thing';
+	d.className = 'dumb_loader_thing' + ( ns? ' ns' : '');
 	if (SPINNER_CSS)
 		d.style.cssText = SPINNER_CSS;
 	document.body.appendChild(d);
@@ -8763,6 +8787,7 @@ var msel = (function () {
 			item.id = links[a].getAttribute('id');
 			item.sel = clgot(links[a].closest('tr'), 'sel');
 			item.vp = href.indexOf('/') !== -1 ? href : vbase + href;
+			item.fn = uricom_dec(href.split('/').pop());
 
 			if (dk) {
 				var m = /[?&](k=[^&#]+)/.exec(qhref);
@@ -9184,7 +9209,7 @@ function show_md(md, name, div, url, depth) {
 		if (depth) {
 			clmod(div, 'raw', 1);
 			div.textContent = "--[ " + name + " ]---------\r\n" + md;
-			return toast.warn(10, errmsg + (WebAssembly ? 'failed to load marked.js' : 'your browser is too old'));
+			return toast.warn(10, errmsg + (WebAssembly ? 'failed to load marked.js' : L.b2old));
 		}
 
 		wfp_debounce.n--;
@@ -9833,6 +9858,7 @@ var rcm = (function () {
 				case 'pla': play('f-' + selFile.id); break;
 				case 'txt': showfile.show(selFile.name); break;
 				case 'md': location = selFile.path + (has(selFile.path, '?') ? '&v' : '?v'); break;
+				case 'wopi': window.open('?wopi=' + selFile.name, '_blank').focus(); break;
 				case 'cpl': cliptxt(selFile.url, function() {toast.ok(2, L.clipped)}); break;
 				case 'dl': ebi('seldl').click(); break;
 				case 'zip': ebi('selzip').click(); break;
@@ -9893,13 +9919,20 @@ var rcm = (function () {
 
 		var has_sel = msel.getsel().length;
 		var has_clip = fileman.clip.length;
+		var ext = (function() {
+			if (!selFile.name) return null;
+			var di = selFile.name.lastIndexOf('.');
+			if (di < 1) return null;
+			return selFile.name.slice(di + 1).toLowerCase();
+		})();
 
 		clmod(ebi('ropn'), 'hide', !selFile.path);
 		clmod(ebi('rply'), 'hide', selFile.type != 'gf' && selFile.type != 'af');
 		clmod(ebi('rpla'), 'hide', selFile.type != 'gf');
 		clmod(ebi('rtxt'), 'hide', !selFile.id);
 		clmod(ebi('rs1'), 'hide', !selFile.path);
-		clmod(ebi('rmd'), 'hide', !selFile.name || selFile.name.slice(-3) != ".md");
+		clmod(ebi('rmd'), 'hide', !selFile.name || ext != "md");
+		clmod(ebi('rwopi'), 'hide', !selFile.name || !wopi_set || !wopi_set.has(ext));
 		clmod(ebi('rcpl'), 'hide', !selFile.path);
 		clmod(ebi('rdl'), 'hide', !has_sel);
 		clmod(ebi('rzip'), 'hide', !has_sel);
