@@ -80,9 +80,6 @@ web/cf.html
 web/copyparty.gif
 web/deps/busy.mp3
 web/deps/mfusepy.py
-web/deps/mini-fa.css
-web/deps/mini-fa.woff
-web/deps/orbitron.woff2
 web/deps/scp.woff2
 web/idp.html
 web/iiam.gif
@@ -94,11 +91,6 @@ web/rups.js
 web/shares.css
 web/shares.html
 web/shares.js
-web/splash.css
-web/splash.html
-web/splash.js
-web/svcs.html
-web/svcs.js
 web/tl/chi.js
 web/tl/cze.js
 web/tl/deu.js

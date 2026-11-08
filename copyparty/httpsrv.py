@@ -193,8 +193,6 @@ class HttpSrv(object):
             "msg",
             "rups",
             "shares",
-            "splash",
-            "svcs",
             "wopi",
         ]
         self.j2 = {x: env.get_template(x + ".html") for x in jn}
